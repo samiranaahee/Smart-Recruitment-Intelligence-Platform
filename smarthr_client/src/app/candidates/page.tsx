@@ -21,6 +21,7 @@ export default function CandidatesPage() {
   const router = useRouter();
   const [candidates, setCandidates] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({
@@ -36,11 +37,12 @@ export default function CandidatesPage() {
 
   const loadCandidates = async () => {
     setLoading(true);
+    setError("");
     try {
       const data = await getCandidates();
       setCandidates(data);
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      setError(err?.message || "Failed to fetch candidates");
     } finally {
       setLoading(false);
     }
@@ -48,6 +50,7 @@ export default function CandidatesPage() {
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError("");
     try {
       await addCandidate({
         ...form,
@@ -56,8 +59,8 @@ export default function CandidatesPage() {
       setShowModal(false);
       setForm({ candidate_name: "", job_title: "", status: "applied", hiring_cost: "", applied_date: "", hired_date: "" });
       loadCandidates();
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      setError(err?.message || "Failed to add candidate");
     }
   };
 
@@ -119,6 +122,19 @@ export default function CandidatesPage() {
         </div>
 
         <div style={s.content}>
+          {error && (
+            <div style={{
+              background: "rgba(239,68,68,0.14)",
+              border: "1px solid rgba(239,68,68,0.35)",
+              color: "#fecaca",
+              borderRadius: "12px",
+              padding: "12px 14px",
+              fontSize: "13px",
+            }}>
+              {error}
+            </div>
+          )}
+
           {/* Search */}
           <div style={s.searchBox}>
             <Search size={16} color="rgba(255,255,255,0.3)" />

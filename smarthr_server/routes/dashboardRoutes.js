@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const protect = require("../middleware/authMIddleware");
+const protect = require("../middleware/authMiddleware");
 const {
   getKPIs,
   getCostPerHire,

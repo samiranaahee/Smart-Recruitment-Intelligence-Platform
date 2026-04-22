@@ -11,7 +11,17 @@ const protect = (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.company = decoded; // { id, email }
+
+    // Support multiple token payload shapes so older tokens still work.
+    const companyId = decoded?.id || decoded?._id || decoded?.companyId;
+    if (!companyId) {
+      return res.status(401).json({ message: "Invalid token payload" });
+    }
+
+    req.company = {
+      ...decoded,
+      id: companyId,
+    };
     next();
   } catch (err) {
     return res.status(401).json({ message: "Invalid or expired token" });

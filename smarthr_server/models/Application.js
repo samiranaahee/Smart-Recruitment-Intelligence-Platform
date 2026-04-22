@@ -28,4 +28,4 @@ const applicationSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-module.exports = mongoose.model("Application", applicationSchema);
+module.exports = mongoose.model("Candidate", applicationSchema);

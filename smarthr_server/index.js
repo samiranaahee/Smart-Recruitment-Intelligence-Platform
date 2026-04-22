@@ -9,6 +9,7 @@ const authRoutes = require("./routes/authRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
 const candidateRoutes = require("./routes/candidateRoutes");
 const jobRoutes = require("./routes/jobRoutes");
+const Candidate = require("./models/Application");
 
 const app = express();
 
@@ -26,11 +27,28 @@ app.get("/", (req, res) => {
   res.json({ message: "SmartHR API is running ✅" });
 });
 
+const cleanupLegacyCandidateIndex = async () => {
+  const legacyIndexName = "company_id_1_email_1_job_id_1";
+
+  try {
+    const indexes = await Candidate.collection.indexes();
+    const hasLegacyIndex = indexes.some((idx) => idx.name === legacyIndexName);
+
+    if (hasLegacyIndex) {
+      await Candidate.collection.dropIndex(legacyIndexName);
+      console.log(`Dropped legacy index: ${legacyIndexName}`);
+    }
+  } catch (err) {
+    console.error("Failed to clean up legacy candidate index:", err.message);
+  }
+};
+
 // Connect to MongoDB then start server
 mongoose
   .connect(process.env.MONGO_URI)
-  .then(() => {
+  .then(async () => {
     console.log("MongoDB connected ✅");
+    await cleanupLegacyCandidateIndex();
     app.listen(process.env.PORT || 5000, () => {
       console.log(`Server running on port ${process.env.PORT || 5000}`);
     });

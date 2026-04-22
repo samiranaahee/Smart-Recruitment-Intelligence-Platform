@@ -8,15 +8,29 @@ const authHeaders = () => ({
   Authorization: `Bearer ${getToken()}`,
 });
 
+const request = async (url: string, options: RequestInit = {}) => {
+  const res = await fetch(url, options);
+  const contentType = res.headers.get("content-type") || "";
+  const isJson = contentType.includes("application/json");
+  const payload = isJson ? await res.json() : await res.text();
+
+  if (!res.ok) {
+    const message =
+      (isJson && payload?.message) ||
+      (typeof payload === "string" && payload) ||
+      `Request failed with status ${res.status}`;
+    throw new Error(message);
+  }
+
+  return payload;
+};
+
 export const loginCompany = async (email: string, password: string) => {
-  const res = await fetch(`${BASE}/auth/login`, {
+  return request(`${BASE}/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password }),
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || "Login failed");
-  return data;
 };
 
 export const registerCompany = async (
@@ -24,78 +38,59 @@ export const registerCompany = async (
   email: string,
   password: string
 ) => {
-  const res = await fetch(`${BASE}/auth/register`, {
+  return request(`${BASE}/auth/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ company_name, email, password }),
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || "Registration failed");
-  return data;
 };
 
 export const getKPIs = async () => {
-  const res = await fetch(`${BASE}/dashboard/kpis`, {
+  return request(`${BASE}/dashboard/kpis`, {
     headers: authHeaders(),
   });
-  if (!res.ok) throw new Error("Failed to fetch KPIs");
-  return res.json();
 };
 
 export const getCostPerHire = async () => {
-  const res = await fetch(`${BASE}/dashboard/cost-per-hire`, {
+  return request(`${BASE}/dashboard/cost-per-hire`, {
     headers: authHeaders(),
   });
-  if (!res.ok) throw new Error("Failed to fetch cost per hire");
-  return res.json();
 };
 
 export const getMonthlyTrends = async () => {
-  const res = await fetch(`${BASE}/dashboard/monthly-trends`, {
+  return request(`${BASE}/dashboard/monthly-trends`, {
     headers: authHeaders(),
   });
-  if (!res.ok) throw new Error("Failed to fetch trends");
-  return res.json();
 };
 export const getCandidates = async () => {
-  const res = await fetch(`${BASE}/candidates`, { headers: authHeaders() });
-  if (!res.ok) throw new Error("Failed to fetch candidates");
-  return res.json();
+  return request(`${BASE}/candidates`, { headers: authHeaders() });
 };
 
 export const addCandidate = async (data: any) => {
-  const res = await fetch(`${BASE}/candidates`, {
+  return request(`${BASE}/candidates`, {
     method: "POST",
     headers: authHeaders(),
     body: JSON.stringify(data),
   });
-  if (!res.ok) throw new Error("Failed to add candidate");
-  return res.json();
 };
 
 export const updateCandidate = async (id: string, data: any) => {
-  const res = await fetch(`${BASE}/candidates/${id}`, {
+  return request(`${BASE}/candidates/${id}`, {
     method: "PUT",
     headers: authHeaders(),
     body: JSON.stringify(data),
   });
-  if (!res.ok) throw new Error("Failed to update candidate");
-  return res.json();
 };
 
 export const deleteCandidate = async (id: string) => {
-  const res = await fetch(`${BASE}/candidates/${id}`, {
+  return request(`${BASE}/candidates/${id}`, {
     method: "DELETE",
     headers: authHeaders(),
   });
-  if (!res.ok) throw new Error("Failed to delete candidate");
-  return res.json();
 };
 
 export const getJobs = async () => {
-  const res = await fetch(`${BASE}/jobs`, { headers: authHeaders() });
-  if (!res.ok) throw new Error("Failed to fetch jobs");
-  return res.json();
+  return request(`${BASE}/jobs`, { headers: authHeaders() });
 };
 
 export const addJob = async (data: any) => {
