@@ -207,34 +207,42 @@ const MONTH_NAMES = ['January','February','March','April','May','June','July','A
 
 // ─── Interview Card ─────────────────────────────────────────────────────────
 
-const InterviewCard = React.memo(function InterviewCard({ interview, onConfirm, onEvaluate }) {
+const InterviewCard = React.memo(function InterviewCard({ interview, onConfirm, onEvaluate, onReschedule, onDelete }) {
   const typeStyle = INTERVIEW_TYPE_STYLE[interview.type] || { bg: '#F5F3FF', color: '#7C3AED' };
   const interviewers = interview.interviewers || [];
-  const mediumIcon = interview.medium === 'On-site' ? '🏢' : interview.medium === 'Zoom' ? '📹' : '💻';
+  const isZoom = interview.medium === 'Zoom';
+  const isGoogleMeet = interview.medium === 'Google Meet';
+  const isVideo = isZoom || isGoogleMeet;
+  const mediumIcon = interview.medium === 'On-site' ? '🏢' : interview.medium === 'Zoom' ? '📹' : interview.medium === 'Phone' ? '📞' : '💻';
+
   const joinUrl =
     interview.zoom_join_url ||
     interview.zoomJoinUrl ||
     interview.google_meet_link ||
     interview.googleMeetLink ||
     null;
-  const joinLabel = interview.zoom_join_url || interview.zoomJoinUrl ? 'Join Zoom' : 'Join Meet';
+
+  const liveColor = isZoom ? '#2D8CFF' : '#1A73E8';
+  const liveLabelText = isZoom ? '📹 Join Zoom' : '💻 Join Google Meet';
+  const liveBgGradient = isZoom ? 'linear-gradient(135deg, #2D8CFF, #1a6fd4)' : 'linear-gradient(135deg, #1A73E8, #0d5bba)';
 
   return (
     <div style={{
-      background: '#fff', borderRadius: 8, border: '1px solid #DDE0EE',
-      padding: '12px 12px 10px', marginBottom: 12,
+      background: '#fff', borderRadius: 10, border: '1px solid #DDE0EE',
+      padding: '14px 14px 12px', marginBottom: 12,
+      boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
     }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
-        <div style={{ fontSize: 12, fontWeight: 600, color: '#1E2035' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#1E2035' }}>
           {interview.candidate_name || interview.candidateName || '—'}
         </div>
         <span style={{
           background: typeStyle.bg, color: typeStyle.color,
-          borderRadius: 10, fontSize: 9, fontWeight: 600, padding: '3px 8px',
+          borderRadius: 10, fontSize: 9, fontWeight: 700, padding: '3px 8px',
         }}>{interview.type}</span>
       </div>
 
-      <div style={{ fontSize: 10, color: '#7A7F99', marginBottom: 4 }}>
+      <div style={{ fontSize: 10, color: '#7A7F99', marginBottom: 8 }}>
         📅 {fmt(interview.scheduled_date)}, {fmtTime(interview.scheduled_date)}
         &nbsp;&nbsp;⏱ {interview.duration || 60} min
         &nbsp;&nbsp;{mediumIcon} {interview.medium}
@@ -259,46 +267,59 @@ const InterviewCard = React.memo(function InterviewCard({ interview, onConfirm, 
         </div>
       )}
 
-      {joinUrl && (
-        <button
-          type="button"
-          onClick={() => window.open(joinUrl, '_blank', 'noopener,noreferrer')}
-          style={{
-            width: '100%',
-            height: 32,
-            background: '#2563EB',
-            color: '#fff',
-            border: 'none',
-            borderRadius: 6,
-            fontSize: 11,
-            fontWeight: 700,
-            cursor: 'pointer',
-            marginBottom: 8,
-            transition: 'background 0.2s',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 4,
-          }}
-          onMouseEnter={(e) => e.target.style.background = '#1d4ed8'}
-          onMouseLeave={(e) => e.target.style.background = '#2563EB'}
-        >
-          🔗 {joinLabel}
-        </button>
+      {/* LIVE JOIN BUTTON — video interviews */}
+      {isVideo && (
+        joinUrl ? (
+          <button
+            type="button"
+            onClick={() => window.open(joinUrl, '_blank', 'noopener,noreferrer')}
+            style={{
+              width: '100%', height: 36,
+              background: liveBgGradient,
+              color: '#fff', border: 'none', borderRadius: 7,
+              fontSize: 12, fontWeight: 700, cursor: 'pointer',
+              marginBottom: 8, display: 'flex', alignItems: 'center',
+              justifyContent: 'center', gap: 8,
+              boxShadow: `0 2px 8px ${liveColor}55`,
+              transition: 'opacity 0.2s',
+            }}
+            onMouseEnter={e => e.currentTarget.style.opacity = '0.88'}
+            onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+          >
+            <span style={{
+              width: 8, height: 8, background: '#FF4444', borderRadius: '50%',
+              boxShadow: '0 0 6px #FF4444', display: 'inline-block',
+              animation: 'livePulse 1.2s ease-in-out infinite',
+            }} />
+            LIVE · {liveLabelText}
+          </button>
+        ) : (
+          <div style={{
+            width: '100%', height: 34, background: '#F8FAFF',
+            border: `1px dashed ${liveColor}66`,
+            borderRadius: 7, fontSize: 10, color: '#7A7F99',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            marginBottom: 8, gap: 6,
+          }}>
+            <span style={{ fontSize: 12 }}>{isZoom ? '📹' : '💻'}</span>
+            {isZoom ? 'Zoom' : 'Google Meet'} link will appear after scheduling
+          </div>
+        )
       )}
 
       {interview.status === 'completed' || interview.score ? (
-        <div style={{ width: '100%', background: '#F0FDF4', color: '#059669', borderRadius: 5, fontSize: 10, fontWeight: 600, padding: '5px 0', textAlign: 'center' }}>
-          Score: {interview.score}/100
+        <div style={{ width: '100%', background: '#F0FDF4', color: '#059669', borderRadius: 6, fontSize: 10, fontWeight: 700, padding: '6px 0', textAlign: 'center' }}>
+          ✓ Score: {interview.score}/100
         </div>
       ) : (
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 6 }}>
           <button
             onClick={() => onConfirm(interview._id, !interview.confirmed)}
             style={{
               flex: 1, background: interview.confirmed ? '#059669' : '#6C63FF',
-              color: '#fff', border: 'none', borderRadius: 5,
-              fontSize: 10, fontWeight: 600, padding: '5px 0', cursor: 'pointer',
+              color: '#fff', border: 'none', borderRadius: 6,
+              fontSize: 10, fontWeight: 700, padding: '6px 0', cursor: 'pointer',
+              transition: 'background 0.2s',
             }}
           >
             {interview.confirmed ? '✓ Confirmed' : 'Confirm'}
@@ -307,22 +328,34 @@ const InterviewCard = React.memo(function InterviewCard({ interview, onConfirm, 
             <button
               onClick={() => onEvaluate(interview)}
               style={{
-                flex: 1, background: '#FBBF24', color: '#fff', border: 'none', borderRadius: 5,
-                fontSize: 10, fontWeight: 600, padding: '5px 0', cursor: 'pointer',
+                flex: 1, background: '#F59E0B', color: '#fff', border: 'none', borderRadius: 6,
+                fontSize: 10, fontWeight: 700, padding: '6px 0', cursor: 'pointer',
               }}
             >
               Evaluate
             </button>
           )}
-          {!interview.confirmed && (
-            <button style={{
-              flex: 1, background: '#F5F6FA', border: '1px solid #DDE0EE',
-              borderRadius: 5, fontSize: 10, fontWeight: 600, color: '#4A4F6A',
-              padding: '5px 0', cursor: 'pointer',
-            }}>
-              Reschedule
-            </button>
-          )}
+          <button
+            onClick={() => onReschedule(interview)}
+            style={{
+              flex: 1, background: '#F5F6FA', border: '1px solid #C8CCE0',
+              borderRadius: 6, fontSize: 10, fontWeight: 700, color: '#4A4F6A',
+              padding: '6px 0', cursor: 'pointer',
+            }}
+          >
+            ↺ Reschedule
+          </button>
+          <button
+            onClick={() => { if (window.confirm('Delete this interview schedule?')) onDelete(interview._id); }}
+            style={{
+              width: 32, minWidth: 32, background: '#FEE2E2', border: '1px solid #FCA5A5',
+              borderRadius: 6, fontSize: 13, color: '#DC2626',
+              padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+            title="Delete Interview"
+          >
+            🗑
+          </button>
         </div>
       )}
     </div>
@@ -348,7 +381,7 @@ export default function TalentFlow() {
 
   // ── schedule modal
   const [showModal, setShowModal] = useState(false);
-  const [newIv, setNewIv] = useState({ candidateId: '', date: '', time: '', type: 'Technical', medium: 'Google Meet', duration: 60 });
+  const [newIv, setNewIv] = useState({ id: null, candidateId: '', date: '', time: '', type: 'Technical', medium: 'Google Meet', duration: 60 });
 
   const [jobs, setJobs] = useState([]);
   const [evalReport, setEvalReport] = useState({ statistics: {}, evaluations: [] });
@@ -397,26 +430,34 @@ export default function TalentFlow() {
   // ── fetch candidates ─────────────────────────────────────────────────────
   const fetchCandidates = useCallback(async () => {
     try {
-      const r = await fetch(`${API}/public/candidates`);
+      const tok = token || await login();
+      if (!tok) return;
+      const r = await fetch(`${API}/candidates`, {
+        headers: { Authorization: `Bearer ${tok}` }
+      });
       if (!r.ok) throw new Error('Failed to load candidates');
       const data = await r.json();
       setCandidates(data);
     } catch (e) {
       setError(e.message);
     }
-  }, []);
+  }, [token, login]);
 
   // ── fetch interviews ─────────────────────────────────────────────────────
   const fetchInterviews = useCallback(async () => {
     try {
-      const r = await fetch(`${API}/public/interviews`);
+      const tok = token || await login();
+      if (!tok) return;
+      const r = await fetch(`${API}/interviews`, {
+        headers: { Authorization: `Bearer ${tok}` }
+      });
       if (!r.ok) throw new Error('Failed to load interviews');
       const data = await r.json();
       setInterviews(data);
     } catch (e) {
       setError(e.message);
     }
-  }, []);
+  }, [token, login]);
 
   // ── initial load + polling every 15 s ───────────────────────────────────
   useEffect(() => {
@@ -469,18 +510,58 @@ export default function TalentFlow() {
 
   // ── confirm interview ────────────────────────────────────────────────────
   const confirmInterview = async (interviewId, confirmed) => {
-    setInterviews(prev => prev.map(i => i._id === interviewId ? { ...i, confirmed } : i));
+    setInterviews(prev => prev.map(i => i._id === interviewId ? { ...i, confirmed, status: confirmed ? 'confirmed' : 'scheduled' } : i));
     try {
       const tok = token || await login();
       if (!tok) return;
       await fetch(`${API}/interviews/${interviewId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok}` },
-        body: JSON.stringify({ confirmed }),
+        body: JSON.stringify({ confirmed, status: confirmed ? 'confirmed' : 'scheduled' }),
       });
     } catch {
       fetchInterviews();
     }
+  };
+
+  // ── delete interview ─────────────────────────────────────────────────────
+  const deleteInterview = async (interviewId) => {
+    setInterviews(prev => prev.filter(i => i._id !== interviewId));
+    try {
+      const tok = token || await login();
+      if (!tok) return;
+      await fetch(`${API}/interviews/${interviewId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${tok}` },
+      });
+    } catch {
+      fetchInterviews();
+    }
+  };
+
+  // ── reschedule interview ────────────────────────────────────────────────
+  const handleReschedule = (iv) => {
+    const d = new Date(iv.scheduled_date);
+    // Format date as YYYY-MM-DD in local time
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
+    const hours = String(d.getHours()).padStart(2, '0');
+    const mins = String(d.getMinutes()).padStart(2, '0');
+    const timeStr = `${hours}:${mins}`;
+    // Ensure candidateId is always a plain string
+    const cid = iv.candidate_id?._id || iv.candidate_id || '';
+    setNewIv({
+      id: iv._id,
+      candidateId: String(cid),
+      date: dateStr,
+      time: timeStr,
+      type: iv.type || 'Technical',
+      medium: iv.medium || 'Google Meet',
+      duration: iv.duration || 60,
+    });
+    setShowModal(true);
   };
 
   // ── schedule interview ───────────────────────────────────────────────────
@@ -490,13 +571,17 @@ export default function TalentFlow() {
     try {
       const tok = token || await login();
       if (!tok) return;
-      const r = await fetch(`${API}/interviews/schedule-external`, {
-        method: 'POST',
+
+      const endpoint = newIv.id ? `${API}/interviews/${newIv.id}` : `${API}/interviews/schedule-external`;
+      const method = newIv.id ? 'PATCH' : 'POST';
+
+      const r = await fetch(endpoint, {
+        method,
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok}` },
         body: JSON.stringify({
           candidateId: newIv.candidateId,
           scheduledDate: scheduled,
-          duration: newIv.duration,
+          duration: parseInt(newIv.duration) || 60,
           type: newIv.type,
           medium: newIv.medium,
           interviewers: ['SR'],
@@ -508,9 +593,9 @@ export default function TalentFlow() {
         throw new Error(msg?.error || 'Failed to schedule interview');
       }
       const result = await r.json();
-      console.log('Interview scheduled successfully:', result);
+      console.log('Interview operation successful:', result);
       setShowModal(false);
-      setNewIv({ candidateId: '', date: '', time: '', type: 'Technical', medium: 'Google Meet', duration: 60 });
+      setNewIv({ id: null, candidateId: '', date: '', time: '', type: 'Technical', medium: 'Google Meet', duration: 60 });
       await new Promise(resolve => setTimeout(resolve, 500)); // Small delay to ensure DB is updated
       fetchInterviews();
     } catch (e) {
@@ -1026,7 +1111,7 @@ export default function TalentFlow() {
                   .slice()
                   .sort((a, b) => new Date(a.scheduled_date) - new Date(b.scheduled_date))
                   .map(iv => (
-                    <InterviewCard key={iv._id} interview={iv} onConfirm={confirmInterview} onEvaluate={(iv) => { setEvalIv(iv); setShowEvalModal(true); }} />
+                    <InterviewCard key={iv._id} interview={iv} onConfirm={confirmInterview} onEvaluate={(iv) => { setEvalIv(iv); setShowEvalModal(true); }} onReschedule={handleReschedule} onDelete={deleteInterview} />
                   ))}
               </div>
             </div>
@@ -1174,7 +1259,9 @@ export default function TalentFlow() {
             }}
             onClick={e => e.stopPropagation()}
           >
-            <div style={{ fontSize: 16, fontWeight: 700, color: '#1E2035', marginBottom: 20 }}>Schedule Interview</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#1E2035', marginBottom: 20 }}>
+              {newIv.id ? '↺ Reschedule Interview' : '+ Schedule Interview'}
+            </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>
                 <label htmlFor="sched-cand" style={{ fontSize: 11, fontWeight: 600, color: '#4A4F6A', display: 'block', marginBottom: 4 }}>Candidate</label>
@@ -1204,12 +1291,12 @@ export default function TalentFlow() {
                 <div style={{ flex: 1 }}>
                   <label htmlFor="sched-date" style={{ fontSize: 11, fontWeight: 600, color: '#4A4F6A', display: 'block', marginBottom: 4 }}>Date</label>
                   <input id="sched-date" type="date" value={newIv.date} onChange={e => setNewIv({ ...newIv, date: e.target.value })}
-                    style={{ width: '100%', height: 34, border: '1px solid #C8CCE0', borderRadius: 6, padding: '0 10px', fontSize: 11 }} />
+                    style={{ width: '100%', height: 34, border: '1px solid #C8CCE0', borderRadius: 6, padding: '0 10px', fontSize: 11, color: '#1E2035' }} />
                 </div>
                 <div style={{ flex: 1 }}>
                   <label htmlFor="sched-time" style={{ fontSize: 11, fontWeight: 600, color: '#4A4F6A', display: 'block', marginBottom: 4 }}>Time</label>
                   <input id="sched-time" type="time" value={newIv.time} onChange={e => setNewIv({ ...newIv, time: e.target.value })}
-                    style={{ width: '100%', height: 34, border: '1px solid #C8CCE0', borderRadius: 6, padding: '0 10px', fontSize: 11 }} />
+                    style={{ width: '100%', height: 34, border: '1px solid #C8CCE0', borderRadius: 6, padding: '0 10px', fontSize: 11, color: '#1E2035' }} />
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 12 }}>
@@ -1227,13 +1314,18 @@ export default function TalentFlow() {
                     <option>Google Meet</option><option>Zoom</option><option>On-site</option><option>Phone</option>
                   </select>
                 </div>
+                <div style={{ flex: 1 }}>
+                  <label htmlFor="sched-duration" style={{ fontSize: 11, fontWeight: 600, color: '#4A4F6A', display: 'block', marginBottom: 4 }}>Duration (min)</label>
+                  <input id="sched-duration" type="number" min="15" step="15" value={newIv.duration} onChange={e => setNewIv({ ...newIv, duration: e.target.value })}
+                    style={{ width: '100%', height: 34, border: '1px solid #C8CCE0', borderRadius: 6, padding: '0 10px', fontSize: 11 }} />
+                </div>
               </div>
             </div>
             <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
-              <button type="button" onClick={scheduleInterview} style={{ flex: 1, height: 36, background: '#6C63FF', color: '#fff', border: 'none', borderRadius: 7, fontWeight: 600, fontSize: 12, cursor: 'pointer' }}>
-                Schedule Interview
+              <button type="button" onClick={scheduleInterview} style={{ flex: 1, height: 36, background: '#6C63FF', color: '#fff', border: 'none', borderRadius: 7, fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
+                {newIv.id ? '↺ Update & Reschedule' : '+ Schedule Interview'}
               </button>
-              <button type="button" onClick={() => setShowModal(false)} style={{ flex: 1, height: 36, background: '#F5F6FA', border: '1px solid #DDE0EE', borderRadius: 7, fontWeight: 600, fontSize: 12, cursor: 'pointer', color: '#4A4F6A' }}>
+              <button type="button" onClick={() => { setShowModal(false); setNewIv({ id: null, candidateId: '', date: '', time: '', type: 'Technical', medium: 'Google Meet', duration: 60 }); }} style={{ flex: 1, height: 36, background: '#F5F6FA', border: '1px solid #DDE0EE', borderRadius: 7, fontWeight: 600, fontSize: 12, cursor: 'pointer', color: '#4A4F6A' }}>
                 Cancel
               </button>
             </div>

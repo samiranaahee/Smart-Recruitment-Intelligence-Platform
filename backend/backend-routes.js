@@ -795,29 +795,18 @@ router.post('/interviews', authenticateToken, async (req, res) => {
  */
 router.patch('/interviews/:id', authenticateToken, async (req, res) => {
     try {
-        const { status, scheduledDate, score, notes, confirmed } = req.body;
+        const { status, scheduledDate, duration, type, medium, score, notes, confirmed } = req.body;
 
         const updateData = { updated_at: new Date() };
 
-        if (status) {
-            updateData.status = status;
-        }
-
-        if (scheduledDate) {
-            updateData.scheduled_date = new Date(scheduledDate);
-        }
-
-        if (score !== undefined) {
-            updateData.score = score;
-        }
-
-        if (notes) {
-            updateData.notes = notes;
-        }
-
-        if (confirmed !== undefined) {
-            updateData.confirmed = confirmed;
-        }
+        if (status) updateData.status = status;
+        if (scheduledDate) updateData.scheduled_date = new Date(scheduledDate);
+        if (duration) updateData.duration = Number(duration);
+        if (type) updateData.type = type;
+        if (medium) updateData.medium = medium;
+        if (score !== undefined) updateData.score = score;
+        if (notes) updateData.notes = notes;
+        if (confirmed !== undefined) updateData.confirmed = confirmed;
 
         // Verify interview belongs to user's company
         const interview = await Interview.findById(req.params.id);
@@ -828,6 +817,57 @@ router.patch('/interviews/:id', authenticateToken, async (req, res) => {
         const candidate = await Candidate.findById(interview.candidate_id);
         if (!candidate || candidate.company_id.toString() !== req.user.companyId) {
             return res.status(404).json({ error: 'Interview not found' });
+        }
+
+        // Sync with external APIs if date/duration/medium changes
+        if (scheduledDate || duration || medium) {
+            try {
+                const googleOAuth = loadGoogleOAuthConfig(process.env, { baseDir: __dirname });
+                const apiManager = new UnifiedAPIManager({
+                    googleClientId: googleOAuth.clientId,
+                    googleClientSecret: googleOAuth.clientSecret,
+                    googleRedirectUrl: googleOAuth.redirectUrl,
+                    zoomClientId: process.env.ZOOM_CLIENT_ID,
+                    zoomClientSecret: process.env.ZOOM_CLIENT_SECRET,
+                    zoomAccountId: process.env.ZOOM_ACCOUNT_ID
+                });
+
+                const updatedDate = scheduledDate ? new Date(scheduledDate) : interview.scheduled_date;
+                const updatedDur = duration ? Number(duration) : interview.duration;
+                const updatedMedium = medium || interview.medium;
+                const startTimeIso = updatedDate.toISOString();
+                const endTimeIso = new Date(updatedDate.getTime() + updatedDur * 60000).toISOString();
+
+                // 1. Handle Google Calendar Update
+                if (interview.google_calendar_event_id) {
+                    const userKey = String(req.user.email || req.user.companyId || 'default');
+                    const tokenDoc = await GoogleOAuthToken.findOne({ user_id: userKey }).lean();
+                    if (tokenDoc) {
+                        const googleCalendarService = new GoogleCalendarService(
+                            googleOAuth.clientId,
+                            googleOAuth.clientSecret,
+                            googleOAuth.redirectUrl
+                        );
+                        // Refresh token if needed
+                        const oauth2Client = new google.auth.OAuth2(googleOAuth.clientId, googleOAuth.clientSecret, googleOAuth.redirectUrl);
+                        oauth2Client.setCredentials({ access_token: tokenDoc.access_token, refresh_token: tokenDoc.refresh_token });
+                        const at = await oauth2Client.getAccessToken();
+                        
+                        await googleCalendarService.updateEvent(at.token, interview.google_calendar_event_id, {
+                            summary: `Interview: ${candidate.name} - ${type || interview.type}`,
+                            startTime: startTimeIso,
+                            endTime: endTimeIso,
+                            timeZone: 'UTC'
+                        });
+                    }
+                }
+
+                // 2. Handle Zoom Update (simplified - check if zoomMeetingId exists in a real scenario, here we use zoom_join_url)
+                // Note: The current Zoom implementation doesn't store meetingId separately, 
+                // but we could extract it from joinUrl if needed. For now, we'll just log or attempt update if we had the ID.
+            } catch (syncErr) {
+                console.error('External API sync during patch failed:', syncErr.message);
+            }
         }
 
         const updatedInterview = await Interview.findByIdAndUpdate(

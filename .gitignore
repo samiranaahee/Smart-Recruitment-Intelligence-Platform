@@ -6,10 +6,6 @@ dist/
 frontend/dist/
 backend/public/assets/
 
-# Local env files / secrets
-backend/.env
-.env
-.env.*
 client_secret*.json
 **/*client_secret*.json
 **/*credentials*.json
@@ -26,4 +22,3 @@ pnpm-debug.log*
 Thumbs.db
 .idea/
 .vscode/
-
