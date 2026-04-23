@@ -18,21 +18,8 @@ TalentFlow is a comprehensive recruitment and hiring intelligence platform that 
 
 ---
 
-## 🚀 Quick Start
 
-### Option 1: Automated Startup (Recommended)
-
-**Windows (Batch)**:
-```bash
-.\START-TALENTFLOW.bat
-```
-
-**Windows/Mac/Linux (PowerShell)**:
-```powershell
-.\START-TALENTFLOW.ps1
-```
-
-### Option 2: Manual Startup
+### Option 1: Startup
 
 ```bash
 # Install dependencies
