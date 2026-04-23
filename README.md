@@ -1,15 +1,11 @@
 # TalentFlow - Recruitment Intelligence Platform
-## Member 2 Integrated with Shared MongoDB
 
-**Status**: ✅ **Production Ready** | Merged with Member 1's MongoDB | All Core Features Working
-
----
 
 ## 📋 Quick Overview
 
-TalentFlow is a comprehensive recruitment and hiring intelligence platform that streamlines the candidate pipeline from application through hire. This is **Member 2's implementation**, now integrated with the shared MongoDB database while maintaining all original features.
+TalentFlow is a comprehensive recruitment and hiring intelligence platform that streamlines the candidate pipeline from application through hire. 
 
-### 🎯 Key Features
+###  Key Features
 
 - ✅ **Candidate Pipeline Management** - Track candidates through applied → shortlisted → interview → offered → hired
 - ✅ **Interview Scheduling** - Schedule interviews with Google Calendar, Google Meet, or Zoom integration
@@ -22,21 +18,8 @@ TalentFlow is a comprehensive recruitment and hiring intelligence platform that 
 
 ---
 
-## 🚀 Quick Start
 
-### Option 1: Automated Startup (Recommended)
-
-**Windows (Batch)**:
-```bash
-.\START-TALENTFLOW.bat
-```
-
-**Windows/Mac/Linux (PowerShell)**:
-```powershell
-.\START-TALENTFLOW.ps1
-```
-
-### Option 2: Manual Startup
+### Option 1: Startup
 
 ```bash
 # Install dependencies
