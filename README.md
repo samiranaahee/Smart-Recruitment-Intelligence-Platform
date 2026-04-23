@@ -1,5 +1,5 @@
 # TalentFlow - Recruitment Intelligence Platform
-## Member 2 Integrated with MongoDB
+
 
 ## 📋 Quick Overview
 
