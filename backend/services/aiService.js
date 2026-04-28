@@ -1,30 +1,11 @@
-const Groq = require("groq-sdk");
-
-const client = new Groq({ apiKey: process.env.GROQ_API_KEY });
-
 const safeParseJSON = (raw) => {
-  const cleaned = raw.replace(/```json|```/g, "").trim();
-  return JSON.parse(cleaned);
-};
-
-const extractSkills = async (resumeText) => {
-  const response = await client.chat.completions.create({
-    model: "llama-3.3-70b-versatile",
-    max_tokens: 500,
-    messages: [
-      {
-        role: "system",
-        content:
-          "You are a technical recruiter. Extract a list of skills from the resume. Include technical skills, tools, frameworks, languages, and soft skills. Return ONLY a valid JSON array of strings. No explanation, no markdown.",
-      },
-      {
-        role: "user",
-        content: resumeText,
-      },
-    ],
-  });
-
-  return safeParseJSON(response.choices[0].message.content);
+  try {
+    const cleaned = raw.replace(/```json|```/g, "").trim();
+    return JSON.parse(cleaned);
+  } catch (e) {
+    console.error("safeParseJSON failed. Raw output:", raw);
+    return null; // return null instead of crashing
+  }
 };
 
 const scoreSkillMatch = async (resumeText, jobDescription) => {
@@ -37,10 +18,10 @@ const scoreSkillMatch = async (resumeText, jobDescription) => {
         content: `You are an expert recruiter. Given a resume and a job description, evaluate the match.
 Return ONLY a valid JSON object with exactly these fields:
 {
-  "score": <number 0-100>,
+  "score": <integer between 0 and 100, no quotes>,
   "reason": "<1-2 sentence explanation of the score>"
 }
-No markdown, no extra fields.`,
+No markdown, no extra fields. The score must be a plain number, not a string.`,
       },
       {
         role: "user",
@@ -49,57 +30,13 @@ No markdown, no extra fields.`,
     ],
   });
 
-  return safeParseJSON(response.choices[0].message.content);
-};
+  const raw = response.choices[0].message.content;
+  console.log("scoreSkillMatch raw response:", raw); // debug log
 
-const analyzeSkillGap = async (resumeText, jobDescription) => {
-  const response = await client.chat.completions.create({
-    model: "llama-3.3-70b-versatile",
-    max_tokens: 600,
-    messages: [
-      {
-        role: "system",
-        content: `You are a career advisor. Compare the candidate's resume to the job description.
-Return ONLY a valid JSON object with exactly these fields:
-{
-  "missingSkills": ["skill1", "skill2"],
-  "explanation": "<paragraph explaining the gaps and how critical they are>"
-}
-No markdown, no extra fields.`,
-      },
-      {
-        role: "user",
-        content: `RESUME:\n${resumeText}\n\nJOB DESCRIPTION:\n${jobDescription}`,
-      },
-    ],
-  });
+  const parsed = safeParseJSON(raw);
 
-  return safeParseJSON(response.choices[0].message.content);
-};
-
-const generateCandidateSummary = async (resumeText) => {
-  const response = await client.chat.completions.create({
-    model: "llama-3.3-70b-versatile",
-    max_tokens: 300,
-    messages: [
-      {
-        role: "system",
-        content:
-          "You are a senior recruiter. Write a professional 3-4 sentence candidate summary based on this resume. Be specific, highlight key strengths, years of experience, and top skills. Write in third person. Return only plain text, no markdown.",
-      },
-      {
-        role: "user",
-        content: resumeText,
-      },
-    ],
-  });
-
-  return response.choices[0].message.content.trim();
-};
-
-module.exports = {
-  extractSkills,
-  scoreSkillMatch,
-  analyzeSkillGap,
-  generateCandidateSummary,
+  return {
+    score: parsed?.score != null ? Number(parsed.score) : 0, // force to Number, fallback 0
+    reason: parsed?.reason || "Could not determine match reason.",
+  };
 };
