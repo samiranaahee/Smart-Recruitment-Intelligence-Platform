@@ -41,6 +41,7 @@ const formatInterview = (iv) => {
 };
 
 // ── POST /api/interviews ───────────────────────────────────────────────────
+
 const scheduleInterview = async (req, res) => {
   try {
     const {
@@ -52,20 +53,19 @@ const scheduleInterview = async (req, res) => {
       type,
       notes,
       meetLink: manualMeetLink,
-      duration    = 60,
+      duration = 60,
       applicationId,
       candidateId,
       scheduledAt: rawScheduledAt,
     } = req.body;
 
-    // Build scheduledAt from date + time strings
     const scheduledAt =
       rawScheduledAt ||
       (date && time ? new Date(`${date}T${time}:00`) : new Date());
 
-    // Try to resolve a real candidate for email invite
+    // Resolve candidate + email
     let resolvedCandidateId = candidateId || null;
-    let candidateEmail      = null;
+    let candidateEmail = null;
 
     if (!resolvedCandidateId && candidateName) {
       const found = await Candidate.findOne({
@@ -73,8 +73,13 @@ const scheduleInterview = async (req, res) => {
       });
       if (found) {
         resolvedCandidateId = found._id;
-        candidateEmail      = found.email;
+        candidateEmail = found.email;
       }
+    }
+
+    if (resolvedCandidateId && !candidateEmail) {
+      const found = await Candidate.findById(resolvedCandidateId);
+      if (found) candidateEmail = found.email;
     }
 
     // Resolve application
@@ -82,15 +87,15 @@ const scheduleInterview = async (req, res) => {
     if (!resolvedApplicationId && resolvedCandidateId) {
       const app = await Application.findOne({
         candidate: resolvedCandidateId,
-        company:   req.company.id,
+        company: req.company.id,
       }).sort({ createdAt: -1 });
       if (app) resolvedApplicationId = app._id;
     }
 
-    // ── Google Calendar event ────────────────────────────────────────────
-    let meetLink        = manualMeetLink || null;
+    // Google Calendar event
+    let meetLink = manualMeetLink || null;
     let calendarEventId = null;
-    let calendarLink    = null;
+    let calendarLink = null;
 
     try {
       const calResult = await createInterviewEvent({
@@ -103,20 +108,19 @@ const scheduleInterview = async (req, res) => {
         type,
         notes,
       });
-      meetLink        = calResult.meetLink  || meetLink;
+      meetLink = calResult.meetLink || meetLink;
       calendarEventId = calResult.eventId;
-      calendarLink    = calResult.htmlLink;
+      calendarLink = calResult.htmlLink;
       console.log("✅ Calendar event created:", calendarLink);
     } catch (calErr) {
-      // Calendar failure must NOT block interview creation
       console.warn("⚠️  Google Calendar (non-fatal):", calErr.message);
     }
 
-    // ── Save interview ───────────────────────────────────────────────────
+    // Save interview
     const interview = await Interview.create({
-      application:     resolvedApplicationId || undefined,
-      candidate:       resolvedCandidateId   || undefined,
-      company:         req.company.id,
+      application:    resolvedApplicationId || undefined,
+      candidate:      resolvedCandidateId   || undefined,
+      company:        req.company.id,
       candidateName,
       interviewerName,
       jobTitle,
@@ -129,16 +133,16 @@ const scheduleInterview = async (req, res) => {
       calendarLink,
     });
 
-    // Update application stage to Interview
     if (resolvedApplicationId) {
       await Application.findByIdAndUpdate(resolvedApplicationId, { stage: "Interview" });
     }
 
-    // Send email invite — non-fatal
+    // Send email invite
     if (candidateEmail) {
       try {
         const candidate = await Candidate.findById(resolvedCandidateId);
         if (candidate) await sendInterviewInvite(candidate, interview, { title: jobTitle });
+        console.log("✅ Interview invite sent to:", candidateEmail);
       } catch (emailErr) {
         console.warn("⚠️  Email invite (non-fatal):", emailErr.message);
       }
