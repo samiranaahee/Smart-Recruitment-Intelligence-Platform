@@ -12,40 +12,51 @@ const {
 // POST /api/candidates/upload
 const uploadCandidate = async (req, res) => {
   try {
-    const { name, email, phone, jobDescription, jobId, companyId } = req.body;
+    const { name, email, phone, jobId, candidateStatement } = req.body;
 
-    if (!name || !email || !jobDescription) {
-      return res.status(400).json({ error: "name, email, and jobDescription are required" });
+    if (!name || !email) {
+      return res.status(400).json({ error: "Name and email are required" });
     }
+
+    const allowedDomains = ["gmail.com", "yahoo.com", "yahoo.co.uk", "g.bracu.ac.bd", "bracu.ac.bd", "outlook.com", "hotmail.com"];
+    const emailDomain = email.split("@")[1]?.toLowerCase();
+    
+    if (!emailDomain || !allowedDomains.includes(emailDomain)) {
+      return res.status(400).json({ error: "Please use a valid email" });
+}
+
+    if (!jobId) {
+      return res.status(400).json({ error: "Please select a job to apply for" });
+    }
+
     if (!req.file) {
       return res.status(400).json({ error: "Resume PDF is required" });
     }
-
-    // Resolve job — use jobId if provided, otherwise find by description match
-    let resolvedJob = null;
-    if (jobId) {
-      resolvedJob = await Job.findById(jobId);
+    // Resolve job
+    const resolvedJob = await Job.findById(jobId);
+    if (!resolvedJob) {
+      return res.status(404).json({ error: "Job not found" });
     }
 
-    // Use job's description for AI scoring if no custom description provided
-    const descriptionForAI = jobDescription || resolvedJob?.description || "";
+    const jobDescription = resolvedJob.description || "";
+    const statement      = candidateStatement || "";
 
     // Step 1: Parse resume PDF
     const resumeText = await parseResume(req.file.buffer);
 
     // Step 2: Run all AI tasks in parallel
+    // All functions now receive candidateStatement for richer analysis
     const [skills, matchResult, gapResult, summary] = await Promise.all([
       extractSkills(resumeText),
-      scoreSkillMatch(resumeText, descriptionForAI),
-      analyzeSkillGap(resumeText, descriptionForAI),
-      generateCandidateSummary(resumeText),
+      scoreSkillMatch(resumeText, jobDescription, statement),
+      analyzeSkillGap(resumeText, jobDescription, statement),
+      generateCandidateSummary(resumeText, statement),
     ]);
 
-    // Step 3: Resolve company — from jobId or from companyId param
+    // Step 3: Resolve company
     const resolvedCompanyId =
-      companyId ||
-      resolvedJob?.company ||
-      req.company?.id ||       // set by authMiddleware in protected routes
+      resolvedJob.company ||
+      req.company?.id     ||
       process.env.DEV_COMPANY_ID;
 
     // Step 4: Save candidate
@@ -53,54 +64,54 @@ const uploadCandidate = async (req, res) => {
       name,
       email,
       phone,
-      appliedJob:       resolvedJob?._id,
-      company:          resolvedCompanyId,
+      appliedJob:        resolvedJob._id,
+      company:           resolvedCompanyId,
       resumeText,
+      candidateStatement: statement,
       skills,
-      skillMatchScore:  matchResult.score,
-      matchReason:      matchResult.reason,
-      missingSkills:    gapResult.missingSkills,
-      skillGapAnalysis: gapResult.explanation,
-      aiSummary:        summary,
+      skillMatchScore:   matchResult.score,
+      matchReason:       matchResult.reason,
+      missingSkills:     gapResult.missingSkills,
+      skillGapAnalysis:  gapResult.explanation,
+      aiSummary:         summary,
       jobDescription,
     });
 
     await candidate.save();
 
-    // Step 5: Auto-create Application record so they appear in Pipeline
-    if (resolvedJob && resolvedCompanyId) {
-      // Avoid duplicate applications (same candidate + same job)
-      const existing = await Application.findOne({
+    // Step 5: Auto-create Application + increment job applicant count
+    const existing = await Application.findOne({
+      candidate: candidate._id,
+      job:       resolvedJob._id,
+    });
+
+    if (!existing) {
+      await Application.create({
         candidate: candidate._id,
         job:       resolvedJob._id,
+        company:   resolvedCompanyId,
+        stage:     "Applied",
+        appliedAt: new Date(),
       });
-
-      if (!existing) {
-        await Application.create({
-          candidate: candidate._id,
-          job:       resolvedJob._id,
-          company:   resolvedCompanyId,
-          stage:     "Applied",
-          appliedAt: new Date(),
-        });
-      }
+      await Job.findByIdAndUpdate(resolvedJob._id, { $inc: { applicants: 1 } });
     }
 
     res.status(201).json({
       message: "Candidate processed successfully",
       candidate: {
-        id:               candidate._id,
-        name:             candidate.name,
-        email:            candidate.email,
-        phone:            candidate.phone,
-        skills:           candidate.skills,
-        skillMatchScore:  candidate.skillMatchScore,
-        matchReason:      candidate.matchReason,
-        missingSkills:    candidate.missingSkills,
-        skillGapAnalysis: candidate.skillGapAnalysis,
-        aiSummary:        candidate.aiSummary,
-        appliedJob:       resolvedJob?.title || null,
-        createdAt:        candidate.createdAt,
+        id:                candidate._id,
+        name:              candidate.name,
+        email:             candidate.email,
+        phone:             candidate.phone,
+        skills:            candidate.skills,
+        skillMatchScore:   candidate.skillMatchScore,
+        matchReason:       candidate.matchReason,
+        missingSkills:     candidate.missingSkills,
+        skillGapAnalysis:  candidate.skillGapAnalysis,
+        aiSummary:         candidate.aiSummary,
+        candidateStatement: statement,
+        appliedJob:        resolvedJob.title,
+        createdAt:         candidate.createdAt,
       },
     });
   } catch (err) {
@@ -112,9 +123,9 @@ const uploadCandidate = async (req, res) => {
 // GET /api/candidates
 const getCandidates = async (req, res) => {
   try {
-    const candidates = await Candidate.find()
+    const candidates = await Candidate.find({ company: req.company.id })
       .select("-resumeText -jobDescription")
-      .populate("appliedJob", "title department")
+      .populate("appliedJob", "title department requiredSkills")
       .sort({ skillMatchScore: -1 });
     res.json(candidates);
   } catch (err) {
@@ -127,7 +138,7 @@ const getCandidateById = async (req, res) => {
   try {
     const candidate = await Candidate.findById(req.params.id)
       .select("-resumeText")
-      .populate("appliedJob", "title department location");
+      .populate("appliedJob", "title department location requiredSkills");
     if (!candidate) return res.status(404).json({ error: "Candidate not found" });
     res.json(candidate);
   } catch (err) {
@@ -140,8 +151,12 @@ const deleteCandidate = async (req, res) => {
   try {
     const candidate = await Candidate.findByIdAndDelete(req.params.id);
     if (!candidate) return res.status(404).json({ error: "Candidate not found" });
-    // Also remove their applications
+
+    if (candidate.appliedJob) {
+      await Job.findByIdAndUpdate(candidate.appliedJob, { $inc: { applicants: -1 } });
+    }
     await Application.deleteMany({ candidate: req.params.id });
+
     res.json({ message: "Candidate deleted successfully" });
   } catch (err) {
     res.status(500).json({ error: err.message });

@@ -10,6 +10,7 @@ const CandidateSchema = new mongoose.Schema(
     appliedJob: { type: mongoose.Schema.Types.ObjectId, ref: "Job" },
     // Which company they applied to
     company:    { type: mongoose.Schema.Types.ObjectId, ref: "Company" },
+    candidateStatement: { type: String, default: "" },
 
     resumeText:       { type: String },
     skills:           { type: [String], default: [] },

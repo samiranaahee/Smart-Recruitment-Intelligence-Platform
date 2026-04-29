@@ -54,21 +54,17 @@ router.get("/google/callback", async (req, res) => {
     }
 
     // ── Write refresh token directly into .env ────────────────────────────
-    const envPath = path.resolve(__dirname, "../../.env");
-    let envContent = fs.existsSync(envPath) ? fs.readFileSync(envPath, "utf8") : "";
+    const envPath = path.resolve(__dirname, "../.env");
+    let envContent = fs.readFileSync(envPath, "utf8");
 
-    if (envContent.includes("GOOGLE_REFRESH_TOKEN=")) {
-      // Replace existing value
-      envContent = envContent.replace(
-        /GOOGLE_REFRESH_TOKEN=.*/,
-        `GOOGLE_REFRESH_TOKEN=${tokens.refresh_token}`
-      );
-    } else {
-      // Append new line
-      envContent += `\nGOOGLE_REFRESH_TOKEN=${tokens.refresh_token}`;
-    }
-
+    envContent = envContent.includes("GOOGLE_REFRESH_TOKEN=")
+      ? envContent.replace(/GOOGLE_REFRESH_TOKEN=.*/, `GOOGLE_REFRESH_TOKEN=${tokens.refresh_token}`)
+      : envContent + `\nGOOGLE_REFRESH_TOKEN=${tokens.refresh_token}`;
+    
     fs.writeFileSync(envPath, envContent);
+    process.env.GOOGLE_REFRESH_TOKEN = tokens.refresh_token;
+    
+    console.log("✅ Refresh token saved:", tokens.refresh_token);
 
     // ── Also set it live on the running process so no restart needed ──────
     process.env.GOOGLE_REFRESH_TOKEN = tokens.refresh_token;
